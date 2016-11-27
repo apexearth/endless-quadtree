@@ -1,0 +1,14 @@
+{
+  "name": "endless-quadtree",
+  "version": "1.0.0",
+  "description": "",
+  "main": "endless-quadtree.spec.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "chai": "^3.5.0"
+  }
+}

@@ -1,23 +1,34 @@
 class Sector {
     constructor({
         dimensions,
+        coordinates,
         childrenSize,
-        entityLimit
+        entityLimit,
+        parent
     }) {
         this.dimensions = dimensions;
-        for (var i in dimensions) {
-            var dimension = dimensions[i];
-            this[dimension + 'Min'] = null;
-            this[dimension + 'Max'] = null;
-        }
+        this.coordinates = Object.assign({}, coordinates);
         this.entityLimit = entityLimit;
         this.entities = [];
+        this.parent = parent;
         this.childrenSize = childrenSize;
         this.children = null;
     }
 
     get count() {
         return this.entities.length;
+    }
+
+    update() {
+        if (this.entities.length > this.entityLimit) {
+            for (var key in this.children) {
+                if (key === 'count') continue;
+                var child = this.children[key];
+                child.update();
+            }
+        } else {
+            // TODO: Ensure entities still belong here.
+        }
     }
 
     add(entity) {
@@ -32,6 +43,9 @@ class Sector {
                 this.addToChildren(entity);
             }
         }
+        if (!this.children) {
+            entity.sector = this;
+        }
         this.entities.push(entity);
         return entity;
     }
@@ -41,7 +55,29 @@ class Sector {
         this.getChildSector(entity).add(entity);
     }
 
+    remove(entity) {
+        if (entity.sector) {
+            let current = entity.sector;
+            entity.sector = null;
+            while (current) {
+                var index = current.entities.indexOf(entity);
+                if (index >= 0) {
+                    current.entities.splice(index, 1);
+                }
+                if (current.entities.length === current.entityLimit) {
+                    // Get rid of child sectors, move entity sectors to current first.
+                    for (let i = 0; i < current.entities.length; i++) {
+                        current.entities[i].sector = current;
+                    }
+                    current.children = null;
+                }
+                current = current.parent;
+            }
+        }
+    }
+
     getChildSector(coordinate) {
+        var coordinates = {};
         var targetSectorKey = '';
         for (var i in this.dimensions) {
             var dimension = this.dimensions[i];
@@ -50,11 +86,15 @@ class Sector {
             if (typeof coordinateDimension !== 'number' || isNaN(coordinateDimension)) {
                 throw new Error('Invalid coordinate received');
             }
-            targetSectorKey += coordinateDimension / this.childrenSize ^ 0;
+            var dimensionCoordinate = coordinateDimension / this.childrenSize ^ 0;
+            coordinates[dimension] = dimensionCoordinate;
+            targetSectorKey += dimensionCoordinate;
         }
         var child = this.children[targetSectorKey];
         if (!child) {
             child = this.children[targetSectorKey] = new Sector({
+                parent: this,
+                coordinates: coordinates,
                 dimensions: this.dimensions,
                 childrenSize: this.childrenSize / 2,
                 entityLimit: this.entityLimit

@@ -24,6 +24,7 @@ describe('Sector', function () {
         expect(sector.count).to.equal(1);
         expect(sector.entities.indexOf(entity) >= 0).to.equal(true);
         expect(entity).to.equal(addedEntity);
+        expect(entity.sector).to.not.equal(null);
 
         addedEntity = sector.add(entity);
         expect(sector.children).to.equal(null);
@@ -59,13 +60,43 @@ describe('Sector', function () {
     });
     it('bench .add()', function () {
         this.timeout(100000);
-        for (var k = 0; k < 100; k++) {
+        for (var k = 0; k < 10; k++) {
             var start = Date.now();
-            for (var i = 0; i < 1000; i++) {
+            for (var i = 0; i < 10000; i++) {
                 sector.add({x: Math.random() * 1000, y: Math.random() * 1000});
             }
             var finish = Date.now();
             console.log(sector.count + ', ' + ((finish - start) / 1000));
+        }
+    });
+    it('.remove()', function () {
+        let entities = [];
+        for (let i = 0; i < 100; i++) {
+            entities.push(sector.add({x: Math.random() * 100, y: Math.random() * 100}));
+        }
+        expect(sector.children).to.not.equal(null);
+        expect(sector.entities.length).to.equal(100);
+        for (let i = 0; i < 100; i++) {
+            sector.remove(entities[i]);
+            expect(sector.entities.length).to.equal(99 - i);
+            expect(entities[i].sector).to.equal(null);
+        }
+        expect(sector.children).to.equal(null);
+        expect(sector.entities.length).to.equal(0);
+    });
+    it('bench .remove()', function () {
+        this.timeout(100000);
+        let entities = [];
+        for (var i = 0; i < 100000; i++) {
+            entities.push(sector.add({x: Math.random() * 1000, y: Math.random() * 1000}));
+        }
+        var start = Date.now();
+        for (let i = 1; i <= 100000; i++) {
+            sector.remove(entities[i - 1]);
+            if (i % 10000 === 0) {
+                console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
+                start = Date.now();
+            }
         }
     });
 });

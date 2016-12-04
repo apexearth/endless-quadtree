@@ -2,16 +2,22 @@ class Sector {
     constructor({
         dimensions,
         coordinates,
+        size,
         childrenSize,
         entityLimit,
         parent
     }) {
         this.dimensions = dimensions;
         this.coordinates = Object.assign({}, coordinates);
+        this.dimensions.forEach(dimension => {
+            this[`min${dimension}`] = this.coordinates[dimension];
+            this[`max${dimension}`] = this.coordinates[dimension] + size;
+        })
         this.entityLimit = entityLimit;
         this.entities = [];
         this.parent = parent;
-        this.childrenSize = childrenSize;
+        this.size = size || Infinity;
+        this.childrenSize = childrenSize || size / 2;
         this.children = null;
     }
 
@@ -51,7 +57,7 @@ class Sector {
     }
 
     addToChildren(entity) {
-        this.children = this.children || {count: 0};
+        this.children = this.children || {};
         this.getChildSector(entity).add(entity);
     }
 
@@ -86,7 +92,7 @@ class Sector {
             if (typeof coordinateDimension !== 'number' || isNaN(coordinateDimension)) {
                 throw new Error('Invalid coordinate received');
             }
-            var dimensionCoordinate = coordinateDimension / this.childrenSize ^ 0;
+            var dimensionCoordinate = (coordinateDimension / this.childrenSize ^ 0) * this.childrenSize;
             coordinates[dimension] = dimensionCoordinate;
             targetSectorKey += dimensionCoordinate;
         }
@@ -96,10 +102,9 @@ class Sector {
                 parent: this,
                 coordinates: coordinates,
                 dimensions: this.dimensions,
-                childrenSize: this.childrenSize / 2,
+                size: this.childrenSize,
                 entityLimit: this.entityLimit
             });
-            this.children.count++;
         }
         return child;
     }
@@ -124,6 +129,57 @@ class Sector {
         }
         return count;
     }
+
+    get(minCoordinate, maxCoordinate) {
+        var childEntities = [];
+        var canTakeAll = true;
+        var dimension = null;
+        if (!this.children) {
+            canTakeAll = true;
+        } else {
+            for (dimension of this.dimensions) {
+                if (this[`min${dimension}`] > minCoordinate[dimension] || this[`max${dimension}`] < maxCoordinate[dimension]) {
+                    canTakeAll = false;
+                    break;
+                }
+            }
+        }
+        if (canTakeAll) {
+            addToArray(this.entities, childEntities);
+        } else {
+            var childrenToDiveInto = [];
+            for (var key in this.children) {
+                var child = this.children[key];
+                var valid = true;
+                for (dimension of this.dimensions) {
+                    if (child[`min${dimension}`] > maxCoordinate[dimension] || child[`max${dimension}`] < minCoordinate[dimension]) {
+                        valid = false;
+                        break;
+                    }
+                }
+                if (valid) {
+                    childrenToDiveInto.push(child);
+                }
+            }
+            childrenToDiveInto.forEach(child => addToArray(child.get(minCoordinate, maxCoordinate), childEntities));
+            // TODO ME!
+        }
+        childEntities = childEntities.filter(entity => {
+            for (var i = 0; i < this.dimensions.length; i++) {
+                var dimension = this.dimensions[i];
+                if (entity[dimension] < minCoordinate[dimension]) return false;
+                if (entity[dimension] > maxCoordinate[dimension]) return false;
+            }
+            return true;
+        })
+        return childEntities;
+    }
 }
 
 module.exports = Sector;
+
+function addToArray(source, target) {
+    for (var i = 0; i < source.length; i++) {
+        target.push(source[i]);
+    }
+}

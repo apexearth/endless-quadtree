@@ -1,5 +1,5 @@
-var expect = require('chai').expect;
-var Sector = require('./Sector');
+const expect = require('chai').expect;
+const Sector = require('./Sector');
 
 describe('Sector', function () {
     let sector;
@@ -12,14 +12,28 @@ describe('Sector', function () {
     });
     it('new', function () {
         expect(sector.entityLimit).to.equal(5);
+        expect(sector.size).to.equal(Infinity);
         expect(sector.childrenSize).to.equal(100);
         expect(sector.dimensions).to.deep.equal([
             'x', 'y'
         ])
+        expect(sector['minx']).to.be.NaN;
+        expect(sector['maxx']).to.be.NaN;
+
+        sector = new Sector({
+            dimensions: ['x', 'y'],
+            size: 100,
+            coordinates: {x: 100, y: 100},
+            entityLimit: 5
+        });
+        expect(sector.size).to.equal(100);
+        expect(sector.childrenSize).to.equal(50);
+        expect(sector['minx']).to.equal(100);
+        expect(sector['maxx']).to.equal(200);
     });
     it('.add()', function () {
-        var entity = {x: 0, y: 0};
-        var addedEntity = sector.add(entity);
+        let entity = {x: 0, y: 0};
+        let addedEntity = sector.add(entity);
         expect(sector.children).to.equal(null);
         expect(sector.count).to.equal(1);
         expect(sector.entities.indexOf(entity) >= 0).to.equal(true);
@@ -45,27 +59,26 @@ describe('Sector', function () {
         sector.add({x: 100, y: 100});
         expect(sector.count).to.equal(7);
         expect(sector.children['0,0'].entities.length).to.equal(6);
-        expect(sector.children['1,1'].entities.length).to.equal(1);
+        expect(sector.children['100,100'].entities.length).to.equal(1);
 
         sector.add({x: -1000, y: -1000});
         expect(sector.entities.length).to.equal(8);
         expect(sector.children['0,0'].entities.length).to.equal(6);
-        expect(sector.children['1,1'].entities.length).to.equal(1);
-        expect(sector.children['-10,-10'].entities.length).to.equal(1);
+        expect(sector.children['100,100'].entities.length).to.equal(1);
+        expect(sector.children['-1000,-1000'].entities.length).to.equal(1);
     });
     it('.addToChildren()', function () {
         sector.addToChildren({x: 0, y: 0});
-        expect(sector.children.count).to.be.equal(1);
         expect(sector.count).to.equal(0)
     });
     it('bench .add()', function () {
         this.timeout(100000);
-        for (var k = 0; k < 10; k++) {
-            var start = Date.now();
-            for (var i = 0; i < 10000; i++) {
+        for (let k = 0; k < 10; k++) {
+            let start = Date.now();
+            for (let i = 0; i < 10000; i++) {
                 sector.add({x: Math.random() * 1000, y: Math.random() * 1000});
             }
-            var finish = Date.now();
+            let finish = Date.now();
             console.log(sector.count + ', ' + ((finish - start) / 1000));
         }
     });
@@ -87,7 +100,7 @@ describe('Sector', function () {
     it('bench .remove()', function () {
         this.timeout(100000);
         let entities = [];
-        for (var i = 0; i < 100000; i++) {
+        for (let i = 0; i < 100000; i++) {
             entities.push(sector.add({x: Math.random() * 1000, y: Math.random() * 1000}));
         }
         var start = Date.now();
@@ -99,4 +112,68 @@ describe('Sector', function () {
             }
         }
     });
+    it('.get()', function () {
+        let putEntities = [
+            sector.add({x: 0, y: 0}),
+            sector.add({x: -200, y: -200}),
+            sector.add({x: 200, y: 200})
+        ];
+        sector.add({x: 3000, y: 0});
+        let getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
+        getEntities.forEach(entity => expect(putEntities.indexOf(entity)).to.be.gte(0))
+
+        for (let i = 0; i < 100; i++) {
+            sector.add({x: Math.random() * 400 - 200, y: Math.random() * 400 - 200})
+            sector.add({x: Math.random() * 400 + 201, y: Math.random() * 400 - 200})
+        }
+        getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
+        expect(getEntities.length).to.equal(103);
+    })
+    it('bench .get()', function () {
+        this.timeout(20000);
+        let putEntities = [
+            sector.add({x: 0, y: 0}),
+            sector.add({x: -200, y: -200}),
+            sector.add({x: 200, y: 200})
+        ];
+        sector.add({x: 3000, y: 0});
+        let getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
+        getEntities.forEach(entity => expect(putEntities.indexOf(entity)).to.be.gte(0))
+
+        for (let i = 0; i < 100; i++) {
+            sector.add({x: Math.random() * 400 - 200, y: Math.random() * 400 - 200})
+            sector.add({x: Math.random() * 400 + 201, y: Math.random() * 400 - 200})
+        }
+        var start = Date.now();
+        getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
+        console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
+        expect(getEntities.length).to.equal(103);
+
+        for (let i = 0; i < 1000; i++) {
+            sector.add({x: Math.random() * 400 - 200, y: Math.random() * 400 - 200})
+            sector.add({x: Math.random() * 400 + 201, y: Math.random() * 400 - 200})
+        }
+        start = Date.now();
+        getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
+        console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
+        expect(getEntities.length).to.equal(1103);
+
+        for (let i = 0; i < 10000; i++) {
+            sector.add({x: Math.random() * 400 - 200, y: Math.random() * 400 - 200})
+            sector.add({x: Math.random() * 400 + 201, y: Math.random() * 400 - 200})
+        }
+        start = Date.now();
+        getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
+        console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
+        expect(getEntities.length).to.equal(11103);
+
+        for (let i = 0; i < 100000; i++) {
+            sector.add({x: Math.random() * 400 - 200, y: Math.random() * 400 - 200})
+            sector.add({x: Math.random() * 400 + 201, y: Math.random() * 400 - 200})
+        }
+        start = Date.now();
+        getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
+        console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
+        expect(getEntities.length).to.equal(111103);
+    })
 });

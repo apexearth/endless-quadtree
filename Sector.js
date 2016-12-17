@@ -4,25 +4,42 @@ class Sector {
         coordinates,
         size,
         childrenSize,
+        childCoordKey,
         entityLimit,
         parent
     }) {
         this.dimensions = dimensions;
-        this.coordinates = Object.assign({}, coordinates);
-        this.dimensions.forEach(dimension => {
-            this[`min${dimension}`] = this.coordinates[dimension];
-            this[`max${dimension}`] = this.coordinates[dimension] + size;
-        })
+        if (coordinates) {
+            this.coordinates = Object.assign({}, coordinates);
+            this.dimensions.forEach(dimension => {
+                this[`min${dimension}`] = this.coordinates[dimension];
+                this[`max${dimension}`] = this.coordinates[dimension] + size;
+            })
+        }
         this.entityLimit = entityLimit;
         this.entities = [];
         this.parent = parent;
         this.size = size || Infinity;
-        this.childrenSize = childrenSize || size / 2;
+        this.childrenSize = childrenSize || (this.size === Infinity ? 200 : size / 2);
+        this.childCoordKey = childCoordKey || undefined;
         this.children = null;
+        this.validate();
+    }
+
+    get isRoot() {
+        return this.size === Infinity;
     }
 
     get count() {
         return this.entities.length;
+    }
+
+    validate() {
+        if (isNaN(this.size)) throw new Error('size ' + size + ' should be a number');
+        if (isNaN(this.childrenSize)) throw new Error('childrenSize ' + childrenSize + ' should be a number');
+        this.dimensions.forEach(dimension => {
+            if (!this.isRoot && isNaN(this.coordinates[dimension])) throw new Error('coordinates[' + dimension + '] + ' + coordinates[dimension] + ' should be a number');
+        })
     }
 
     update() {
@@ -39,8 +56,8 @@ class Sector {
 
     add(entity) {
         if (this.entities.indexOf(entity) >= 0) return entity;
-        if (this.entities.length >= this.entityLimit && (this.children || this.getCountAtCoordinate(entity) < this.entityLimit)) {
-            if (!this.children && this.entities.length >= this.entityLimit) {
+        if (this.entities.length > this.entityLimit && (this.children || this.size === Infinity || this.getCountAtCoordinate(this.getEntityCoordinate(entity)) <= this.entityLimit)) {
+            if (!this.children && this.entities.length > this.entityLimit) {
                 for (var i in this.entities) {
                     this.addToChildren(this.entities[i]);
                 }
@@ -58,7 +75,7 @@ class Sector {
 
     addToChildren(entity) {
         this.children = this.children || {};
-        this.getChildSector(entity).add(entity);
+        this.getChildSector(this.getEntityCoordinate(entity)).add(entity);
     }
 
     remove(entity) {
@@ -103,10 +120,19 @@ class Sector {
                 coordinates: coordinates,
                 dimensions: this.dimensions,
                 size: this.childrenSize,
-                entityLimit: this.entityLimit
+                entityLimit: this.entityLimit,
+                childCoordKey: this.childCoordKey,
             });
         }
         return child;
+    }
+
+    getEntityCoordinate(entity) {
+        if (this.childCoordKey !== undefined) {
+            return entity[this.childCoordKey];
+        } else {
+            return entity;
+        }
     }
 
     getCountAtCoordinate(coordinate) {

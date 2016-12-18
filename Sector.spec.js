@@ -164,4 +164,34 @@ describe('Sector', function () {
             expect(getEntities.length).to.equal(count);
         }
     });
+    it('.getSectors()', function () {
+        for (let x = 0; x < 100; x += 5) {
+            for (let y = 0; y < 100; y += 5) {
+                sector.add({x, y})
+            }
+        }
+        const sectors = sector.getSectors({x: 0, y: 0}, {x: 50, y: 50});
+        expect(sectors.length).to.equal(41);
+        for (let sector of sectors) {
+            expect(sector.minx).to.be.lte(50)
+            expect(sector.miny).to.be.lte(50)
+        }
+    });
+    it('.getSectorsExcluding()', function () {
+        for (let x = 0; x < 100; x += 5) {
+            for (let y = 0; y < 100; y += 5) {
+                sector.add({x, y})
+            }
+        }
+        const sectors = sector.getSectorsOutside({x: 0, y: 0}, {x: 50, y: 50});
+        expect(sectors.length).to.equal(71);
+        for (let sector of sectors) {
+            if (sector.maxy <= 50) {
+                expect(sector.maxx).to.be.gt(50)
+            }
+            if (sector.maxx <= 50) {
+                expect(sector.maxy).to.be.gt(50)
+            }
+        }
+    });
 });

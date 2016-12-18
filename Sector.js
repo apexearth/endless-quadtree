@@ -156,11 +156,18 @@ class Sector {
         return count;
     }
 
-    get(minCoordinate, maxCoordinate) {
+    /**
+     * Get entities within coordinates.
+     * @param minCoordinate
+     * @param maxCoordinate
+     * @param alwaysTakeAll Always take all entities from sectors within the coordinates.
+     * @returns {Array}
+     */
+    get(minCoordinate, maxCoordinate, alwaysTakeAll) {
         var childEntities = [];
         var canTakeAll = true;
         var dimension = null;
-        if (!this.children) {
+        if (!this.children || alwaysTakeAll) {
             canTakeAll = true;
         } else {
             for (dimension of this.dimensions) {
@@ -173,20 +180,7 @@ class Sector {
         if (canTakeAll) {
             addToArray(this.entities, childEntities);
         } else {
-            var childrenToDiveInto = [];
-            for (var key in this.children) {
-                var child = this.children[key];
-                var valid = true;
-                for (dimension of this.dimensions) {
-                    if (child[`min${dimension}`] > maxCoordinate[dimension] || child[`max${dimension}`] < minCoordinate[dimension]) {
-                        valid = false;
-                        break;
-                    }
-                }
-                if (valid) {
-                    childrenToDiveInto.push(child);
-                }
-            }
+            var childrenToDiveInto = this.getSectors(minCoordinate, maxCoordinate);
             childrenToDiveInto.forEach(child => addToArray(child.get(minCoordinate, maxCoordinate), childEntities));
             // TODO ME!
         }
@@ -199,6 +193,45 @@ class Sector {
             return true;
         })
         return childEntities;
+    }
+
+    coordinatesOverlap(minCoordinate, maxCoordinate) {
+        for (let dimension of this.dimensions) {
+            if (this[`min${dimension}`] > maxCoordinate[dimension] || this[`max${dimension}`] < minCoordinate[dimension]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    getSectors(minCoordinate, maxCoordinate) {
+        let sectors = [];
+        if (this.children) {
+            for (let key in this.children) {
+                var child = this.children[key];
+                if (child.coordinatesOverlap(minCoordinate, maxCoordinate)) {
+                    sectors = sectors.concat(child.getSectors(minCoordinate, maxCoordinate));
+                }
+            }
+        } else {
+            sectors.push(this);
+        }
+        return sectors;
+    }
+
+    getSectorsOutside(minCoordinate, maxCoordinate) {
+        let sectors = [];
+        if (this.children) {
+            for (let key in this.children) {
+                var child = this.children[key];
+                sectors = sectors.concat(child.getSectorsOutside(minCoordinate, maxCoordinate));
+            }
+        } else {
+            if (!this.coordinatesOverlap(minCoordinate, maxCoordinate)) {
+                sectors.push(this);
+            }
+        }
+        return sectors;
     }
 }
 

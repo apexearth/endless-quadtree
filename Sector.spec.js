@@ -100,11 +100,11 @@ describe('Sector', function () {
     it('bench .remove()', function () {
         this.timeout(100000);
         let entities = [];
-        for (let i = 0; i < 100000; i++) {
+        for (let i = 0; i < 50000; i++) {
             entities.push(sector.add({x: Math.random() * 1000, y: Math.random() * 1000}));
         }
         var start = Date.now();
-        for (let i = 1; i <= 100000; i++) {
+        for (let i = 1; i <= 50000; i++) {
             sector.remove(entities[i - 1]);
             if (i % 10000 === 0) {
                 console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
@@ -163,6 +163,25 @@ describe('Sector', function () {
             console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
             expect(getEntities.length).to.equal(count);
         }
+    });
+    it('.getWithinDistance()', function () {
+        for (let x = 0; x < 100; x += 5) {
+            for (let y = 0; y < 100; y += 5) {
+                sector.add({x, y})
+            }
+        }
+        let entities = sector.getWithinDistance({x: 50, y: 50}, 10);
+        expect(entities.length).to.equal(13);
+    });
+    it('.getWithinDistance() (using entityCoordKey)', function () {
+        sector.entityCoordKey = 'position';
+        for (let x = 0; x < 100; x += 5) {
+            for (let y = 0; y < 100; y += 5) {
+                sector.add({position: {x, y}})
+            }
+        }
+        let entities = sector.getWithinDistance({x: 50, y: 50}, 10);
+        expect(entities.length).to.equal(13);
     });
     it('.getSectors()', function () {
         for (let x = 0; x < 100; x += 5) {

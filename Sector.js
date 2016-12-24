@@ -4,7 +4,7 @@ class Sector {
         coordinates,
         size,
         childrenSize,
-        childCoordKey,
+        entityCoordKey,
         entityLimit,
         parent
     }) {
@@ -21,7 +21,7 @@ class Sector {
         this.parent = parent;
         this.size = size || Infinity;
         this.childrenSize = childrenSize || (this.size === Infinity ? 200 : size / 2);
-        this.childCoordKey = childCoordKey || undefined;
+        this.entityCoordKey = entityCoordKey || undefined;
         this.children = null;
         this.validate();
     }
@@ -121,15 +121,15 @@ class Sector {
                 dimensions: this.dimensions,
                 size: this.childrenSize,
                 entityLimit: this.entityLimit,
-                childCoordKey: this.childCoordKey,
+                entityCoordKey: this.entityCoordKey,
             });
         }
         return child;
     }
 
     getEntityCoordinate(entity) {
-        if (this.childCoordKey !== undefined) {
-            return entity[this.childCoordKey];
+        if (this.entityCoordKey !== undefined) {
+            return entity[this.entityCoordKey];
         } else {
             return entity;
         }
@@ -193,6 +193,27 @@ class Sector {
             return true;
         })
         return childEntities;
+    }
+
+    getWithinDistance(coordinate, distance) {
+        return this.get(
+            {
+                x: coordinate.x - distance,
+                y: coordinate.y - distance
+            },
+            {
+                x: coordinate.x + distance,
+                y: coordinate.y + distance
+            },
+            true
+        ).filter(object=> {
+            var total = 0
+            var objectCoordinate = this.getEntityCoordinate(object)
+            for (let dimension of this.dimensions) {
+                total += Math.pow(Math.abs(objectCoordinate[dimension] - coordinate[dimension]), 2)
+            }
+            return Math.sqrt(total) <= distance;
+        });
     }
 
     coordinatesOverlap(minCoordinate, maxCoordinate) {

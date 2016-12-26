@@ -167,8 +167,10 @@ class Sector {
         var childEntities = [];
         var canTakeAll = true;
         var dimension = null;
-        if (!this.children || alwaysTakeAll) {
+        if (alwaysTakeAll) {
             canTakeAll = true;
+        } else if (this.size === Infinity) {
+            canTakeAll = false;
         } else {
             for (dimension of this.dimensions) {
                 if (this[`min${dimension}`] > minCoordinate[dimension] || this[`max${dimension}`] < maxCoordinate[dimension]) {
@@ -179,10 +181,12 @@ class Sector {
         }
         if (canTakeAll) {
             addToArray(this.entities, childEntities);
+            return childEntities;
+        } else if (!this.children) {
+            addToArray(this.entities, childEntities);
         } else {
             var childrenToDiveInto = this.getSectors(minCoordinate, maxCoordinate);
             childrenToDiveInto.forEach(child => addToArray(child.get(minCoordinate, maxCoordinate), childEntities));
-            // TODO ME!
         }
         childEntities = childEntities.filter(entity => {
             for (var i = 0; i < this.dimensions.length; i++) {

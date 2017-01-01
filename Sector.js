@@ -1,3 +1,5 @@
+const assert = require('assert');
+
 class Sector {
     constructor({
         dimensions,
@@ -6,7 +8,9 @@ class Sector {
         childrenSize,
         entityCoordKey,
         entityLimit,
-        parent
+        minCoordinateResolution,
+        parent,
+        root
     }) {
         this.dimensions = dimensions;
         if (coordinates) {
@@ -17,7 +21,9 @@ class Sector {
             })
         }
         this.entityLimit = entityLimit;
+        this.minCoordinateResolution = minCoordinateResolution || 1;
         this.entities = [];
+        this.root = root || this;
         this.parent = parent;
         this.size = size || Infinity;
         this.childrenSize = childrenSize || (this.size === Infinity ? 200 : size / 2);
@@ -43,22 +49,29 @@ class Sector {
     }
 
     update() {
-        if (this.entities.length > this.entityLimit) {
-            for (var key in this.children) {
-                if (key === 'count') continue;
-                var child = this.children[key];
-                child.update();
+        if (this.children) {
+            for (let key in this.children) {
+                this.children[key].update();
             }
         } else {
-            // TODO: Ensure entities still belong here.
+            for (let entity of this.entities) {
+                if (this.entityShouldRelocate(this.getEntityCoordinate(entity))) {
+                    this.root.remove(entity)
+                    this.root.add(entity)
+                }
+            }
         }
+    }
+
+    entityShouldRelocate(entity) {
+        return !this.parent || this.parent.getChildSector(entity) !== this;
     }
 
     add(entity) {
         if (this.entities.indexOf(entity) >= 0) return entity;
         if (this.entities.length > this.entityLimit && (this.children || this.size === Infinity || this.getCountAtCoordinate(this.getEntityCoordinate(entity)) <= this.entityLimit)) {
             if (!this.children && this.entities.length > this.entityLimit) {
-                for (var i in this.entities) {
+                for (let i in this.entities) {
                     this.addToChildren(this.entities[i]);
                 }
                 this.addToChildren(entity);
@@ -100,22 +113,23 @@ class Sector {
     }
 
     getChildSector(coordinate) {
-        var coordinates = {};
-        var targetSectorKey = '';
-        for (var i in this.dimensions) {
-            var dimension = this.dimensions[i];
+        let coordinates = {};
+        let targetSectorKey = '';
+        for (let i in this.dimensions) {
+            let dimension = this.dimensions[i];
             if (targetSectorKey) targetSectorKey += ',';
-            var coordinateDimension = coordinate[dimension];
+            let coordinateDimension = coordinate[dimension];
             if (typeof coordinateDimension !== 'number' || isNaN(coordinateDimension)) {
                 throw new Error('Invalid coordinate received');
             }
-            var dimensionCoordinate = (coordinateDimension / this.childrenSize ^ 0) * this.childrenSize;
+            let dimensionCoordinate = Math.floor(coordinateDimension / this.childrenSize) * this.childrenSize;
             coordinates[dimension] = dimensionCoordinate;
             targetSectorKey += dimensionCoordinate;
         }
-        var child = this.children[targetSectorKey];
+        let child = this.children[targetSectorKey];
         if (!child) {
             child = this.children[targetSectorKey] = new Sector({
+                root: this.root || this,
                 parent: this,
                 coordinates: coordinates,
                 dimensions: this.dimensions,
@@ -136,19 +150,19 @@ class Sector {
     }
 
     getCountAtCoordinate(coordinate) {
-        var compare = (entity) => {
-            for (var i in this.dimensions) {
-                var dimension = this.dimensions[i];
-                if (entity[dimension] !== coordinate[dimension]) {
+        const compare = (entity) => {
+            for (let i in this.dimensions) {
+                let dimension = this.dimensions[i];
+                if (Math.abs(entity[dimension] - coordinate[dimension]) >= this.minCoordinateResolution) {
                     return false;
                 }
             }
             return true;
         };
 
-        var count = 0;
-        for (var e in this.entities) {
-            var entity = this.entities[e];
+        let count = 0;
+        for (let e in this.entities) {
+            let entity = this.entities[e];
             if (compare(entity)) {
                 count++;
             }
@@ -163,10 +177,10 @@ class Sector {
      * @param alwaysTakeAll Always take all entities from sectors within the coordinates.
      * @returns {Array}
      */
-    get(minCoordinate, maxCoordinate, alwaysTakeAll) {
-        var childEntities = [];
-        var canTakeAll = true;
-        var dimension = null;
+    get(minCoordinate, maxCoordinate, alwaysTakeAll, diveIn = true) {
+        let childEntities = [];
+        let canTakeAll = true;
+        let dimension = null;
         if (alwaysTakeAll) {
             canTakeAll = true;
         } else if (this.size === Infinity) {
@@ -184,13 +198,15 @@ class Sector {
             return childEntities;
         } else if (!this.children) {
             addToArray(this.entities, childEntities);
+        } else if (diveIn) {
+            let childrenToDiveInto = this.getSectors(minCoordinate, maxCoordinate);
+            childrenToDiveInto.forEach(child => addToArray(child.get(minCoordinate, maxCoordinate, alwaysTakeAll, diveIn), childEntities));
         } else {
-            var childrenToDiveInto = this.getSectors(minCoordinate, maxCoordinate);
-            childrenToDiveInto.forEach(child => addToArray(child.get(minCoordinate, maxCoordinate), childEntities));
+            addToArray(this.parent.get(minCoordinate, maxCoordinate, alwaysTakeAll, diveIn), childEntities)
         }
         childEntities = childEntities.filter(entity => {
-            for (var i = 0; i < this.dimensions.length; i++) {
-                var dimension = this.dimensions[i];
+            for (let i = 0; i < this.dimensions.length; i++) {
+                let dimension = this.dimensions[i];
                 if (entity[dimension] < minCoordinate[dimension]) return false;
                 if (entity[dimension] > maxCoordinate[dimension]) return false;
             }
@@ -209,15 +225,19 @@ class Sector {
                 x: coordinate.x + distance,
                 y: coordinate.y + distance
             },
-            true
-        ).filter(object=> {
-            var total = 0
-            var objectCoordinate = this.getEntityCoordinate(object)
-            for (let dimension of this.dimensions) {
-                total += Math.pow(Math.abs(objectCoordinate[dimension] - coordinate[dimension]), 2)
-            }
-            return Math.sqrt(total) <= distance;
-        });
+            false
+        ).filter(
+            this.withinDistance.bind(this, coordinate, distance)
+        );
+    }
+
+    withinDistance(coordinate, distance, entity) {
+        let total = 0
+        let entityCoordinate = this.getEntityCoordinate(entity)
+        for (let dimension of this.dimensions) {
+            total += Math.pow(Math.abs(entityCoordinate[dimension] - coordinate[dimension]), 2)
+        }
+        return Math.sqrt(total) <= distance;
     }
 
     coordinatesOverlap(minCoordinate, maxCoordinate) {
@@ -233,7 +253,7 @@ class Sector {
         let sectors = [];
         if (this.children) {
             for (let key in this.children) {
-                var child = this.children[key];
+                const child = this.children[key];
                 if (child.coordinatesOverlap(minCoordinate, maxCoordinate)) {
                     sectors = sectors.concat(child.getSectors(minCoordinate, maxCoordinate));
                 }
@@ -248,7 +268,7 @@ class Sector {
         let sectors = [];
         if (this.children) {
             for (let key in this.children) {
-                var child = this.children[key];
+                const child = this.children[key];
                 sectors = sectors.concat(child.getSectorsOutside(minCoordinate, maxCoordinate));
             }
         } else {
@@ -263,7 +283,7 @@ class Sector {
 module.exports = Sector;
 
 function addToArray(source, target) {
-    for (var i = 0; i < source.length; i++) {
+    for (let i = 0; i < source.length; i++) {
         target.push(source[i]);
     }
 }

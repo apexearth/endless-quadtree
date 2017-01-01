@@ -75,7 +75,7 @@ describe('Sector', function () {
         this.timeout(100000);
         for (let k = 0; k < 10; k++) {
             let start = Date.now();
-            for (let i = 0; i < 10000; i++) {
+            for (let i = 0; i < 2000; i++) {
                 sector.add({x: Math.random() * 1000, y: Math.random() * 1000});
             }
             let finish = Date.now();
@@ -100,13 +100,13 @@ describe('Sector', function () {
     it('bench .remove()', function () {
         this.timeout(100000);
         let entities = [];
-        for (let i = 0; i < 50000; i++) {
+        for (let i = 0; i < 20000; i++) {
             entities.push(sector.add({x: Math.random() * 1000, y: Math.random() * 1000}));
         }
         var start = Date.now();
-        for (let i = 1; i <= 50000; i++) {
+        for (let i = 1; i <= 20000; i++) {
             sector.remove(entities[i - 1]);
-            if (i % 10000 === 0) {
+            if (i % 5000 === 0) {
                 console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
                 start = Date.now();
             }
@@ -140,20 +140,11 @@ describe('Sector', function () {
         let getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
         getEntities.forEach(entity => expect(putEntities.indexOf(entity)).to.be.gte(0))
 
-        var count = 3;
-        for (let i = 0; i < 100; i++) {
-            count++;
-            sector.add({x: Math.random() * 400 - 200, y: Math.random() * 400 - 200})
-            sector.add({x: Math.random() * 400 + 201, y: Math.random() * 400 - 200})
-        }
-        var start = Date.now();
-        getEntities = sector.get({x: -200, y: -200}, {x: 200, y: 200});
-        console.log(sector.count + ', ' + ((Date.now() - start) / 1000));
-        expect(getEntities.length).to.equal(count);
+        let count = 3;
+        let start;
+        for (let k = 0; k < 5; k++) {
 
-        for (let k = 0; k < 30; k++) {
-
-            for (let i = 0; i < 1000; i++) {
+            for (let i = 0; i < 2000; i++) {
                 count++;
                 sector.add({x: Math.random() * 400 - 200, y: Math.random() * 400 - 200});
                 sector.add({x: Math.random() * 400 + 201, y: Math.random() * 400 - 200});
@@ -184,13 +175,13 @@ describe('Sector', function () {
         expect(entities.length).to.equal(13);
     });
     it('.getSectors()', function () {
-        for (let x = 0; x < 100; x += 5) {
-            for (let y = 0; y < 100; y += 5) {
+        for (let x = -100; x < 100; x += 5) {
+            for (let y = -100; y < 100; y += 5) {
                 sector.add({x, y})
             }
         }
-        const sectors = sector.getSectors({x: 0, y: 0}, {x: 50, y: 50});
-        expect(sectors.length).to.equal(41);
+        const sectors = sector.getSectors({x: -10, y: -10}, {x: 50, y: 50});
+        expect(sectors.length).to.equal(52);
         for (let sector of sectors) {
             expect(sector.minx).to.be.lte(50)
             expect(sector.miny).to.be.lte(50)
@@ -212,5 +203,39 @@ describe('Sector', function () {
                 expect(sector.maxy).to.be.gt(50)
             }
         }
+    });
+    it('.getCountAtCoordinate()', function () {
+        sector.add({x: 50, y: 50});
+        sector.add({x: 50, y: 50});
+        sector.add({x: 50, y: 50});
+        sector.add({x: 50, y: 51});
+        sector.add({x: 50, y: 50.0000000000001});
+        expect(sector.getCountAtCoordinate({x: 50, y: 50})).to.equal(4)
+    });
+    it('.entityShouldRelocate()', function () {
+        for (let x = 0; x < 100; x += 5) {
+            for (let y = 0; y < 100; y += 5) {
+                sector.add({x, y})
+            }
+        }
+        let coord = {x: 50, y: 50};
+        sector.add(coord);
+        expect(coord.sector.entityShouldRelocate(coord)).to.equal(false);
+        coord.x += 50;
+        expect(coord.sector.entityShouldRelocate(coord)).to.equal(true);
+    });
+    it('.update()', function () {
+        for (let x = 0; x < 100; x += 5) {
+            for (let y = 0; y < 100; y += 5) {
+                sector.add({x, y})
+            }
+        }
+        let coord = {x: 50, y: 50};
+        sector.add(coord);
+        expect(coord.sector.entityShouldRelocate(coord)).to.equal(false);
+        coord.x += 50;
+        expect(coord.sector.entityShouldRelocate(coord)).to.equal(true);
+        sector.update();
+        expect(coord.sector.entityShouldRelocate(coord)).to.equal(false);
     });
 });

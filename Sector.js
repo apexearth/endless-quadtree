@@ -10,7 +10,8 @@ class Sector {
         entityLimit,
         minCoordinateResolution,
         parent,
-        root
+        root,
+        key
     }) {
         this.dimensions = dimensions;
         if (coordinates) {
@@ -25,6 +26,7 @@ class Sector {
         this.entities = [];
         this.root = root || this;
         this.parent = parent;
+        this.key = key;
         this.size = size || Infinity;
         this.childrenSize = childrenSize || (this.size === Infinity ? 200 : size / 2);
         this.entityCoordKey = entityCoordKey || undefined;
@@ -96,16 +98,18 @@ class Sector {
             let current = entity.sector;
             entity.sector = null;
             while (current) {
-                var index = current.entities.indexOf(entity);
+                let index = current.entities.indexOf(entity);
                 if (index >= 0) {
                     current.entities.splice(index, 1);
                 }
-                if (current.entities.length === current.entityLimit) {
+                if (current.children && current.entities.length === current.entityLimit) {
                     // Get rid of child sectors, move entity sectors to current first.
                     for (let i = 0; i < current.entities.length; i++) {
                         current.entities[i].sector = current;
                     }
                     current.children = null;
+                } else if (current.entities.length === 0 && current.parent) {
+                    delete current.parent.children[current.key]
                 }
                 current = current.parent;
             }
@@ -131,6 +135,7 @@ class Sector {
             child = this.children[targetSectorKey] = new Sector({
                 root: this.root || this,
                 parent: this,
+                key: targetSectorKey,
                 coordinates: coordinates,
                 dimensions: this.dimensions,
                 size: this.childrenSize,

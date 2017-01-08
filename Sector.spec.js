@@ -96,6 +96,38 @@ describe('Sector', function () {
         }
         expect(sector.children).to.equal(null);
         expect(sector.entities.length).to.equal(0);
+
+        sector.entityLimit = 1;
+        sector.childrenSize = 10;
+        let coords = [
+            sector.add({x: 0, y: 0}),
+            sector.add({x: 0, y: 0}),
+            sector.add({x: 10, y: 0}),
+            sector.add({x: 12, y: 0}),
+            sector.add({x: 20, y: 0}),
+            sector.add({x: 22, y: 0}),
+            sector.add({x: 30, y: 0}),
+            sector.add({x: 32, y: 0}),
+            sector.add({x: 40, y: 0}),
+            sector.add({x: 42, y: 0})
+        ]
+        expect(Object.keys(sector.children).length).to.equal(5);
+        sector.remove(coords.pop())
+        sector.remove(coords.pop())
+        expect(Object.keys(sector.children).length).to.equal(4);
+        sector.remove(coords.pop())
+        sector.remove(coords.pop())
+        expect(Object.keys(sector.children).length).to.equal(3);
+        sector.remove(coords.pop())
+        sector.remove(coords.pop())
+        expect(Object.keys(sector.children).length).to.equal(2);
+        sector.remove(coords.pop())
+        sector.remove(coords.pop())
+        expect(Object.keys(sector.children).length).to.equal(1);
+        sector.remove(coords.pop())
+        sector.remove(coords.pop())
+        expect(sector.children).to.equal(null);
+
     });
     it('bench .remove()', function () {
         this.timeout(100000);
